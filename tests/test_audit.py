@@ -34,7 +34,8 @@ RULES = [{"contains": "STORE B", "kind": "receive", "person_id": "c2", "label": 
 
 def test_daily_run_leaves_collections_for_month_close():
     r = daily.audit(RECEIVABLES, PAYABLES, ORDERS, RULES, TODAY)
-    assert r["kind"] == "daily" and "overdue_receivables" not in r and "orders_without_customer" in r
+    assert r["kind"] == "daily" and "overdue_receivables" not in r and "unclassified_bank_entries" not in r
+    assert "orders_without_customer" in r
     assert daily.audit(RECEIVABLES, PAYABLES, ORDERS, RULES, date(2026, 11, 1))["kind"] == "month_close"
 
 

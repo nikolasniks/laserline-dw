@@ -10,7 +10,7 @@ Checks (read-only):
   - open "- saldo" bills left by partial payments
 
 Customer collections (received-without-bank, orders without receivable, overdue
-receivables, open partial balances) are only checked at month close: some
+receivables, open partial balances) and unclassified bank entries are only checked at month close: some
 customers settle the whole month at the end of it, so day to day those checks
 are just noise. `CLOSE_DAY` (default 1) or `full=True` turns them on.
 
@@ -34,7 +34,8 @@ MATCH_DAYS = 5
 ORDER_GRACE_DAYS = 2
 PAYABLE_HEADS_UP = 3
 CLOSE_DAY = int(os.getenv("AUDIT_CLOSE_DAY", "1"))
-CLOSE_ONLY = ("received_without_bank_entry", "orders_without_receivable", "overdue_receivables", "open_partial_balances")
+CLOSE_ONLY = ("received_without_bank_entry", "orders_without_receivable", "overdue_receivables", "open_partial_balances",
+              "unclassified_bank_entries")
 BANK_PREFIXES = ("PIX ", "TED ", "DOC ", "TRANSFERENCIA", "DEPOSITO")
 
 

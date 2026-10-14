@@ -60,7 +60,7 @@ balances. Result lands in `audit/` in the reports bucket; if there's anything,
 it goes out by e-mail through an SNS topic (`AlertEmail` parameter).
 
 Collections (overdue receivables, orders without receivable, received without a
-bank entry, partial balances) only run at month close (`AUDIT_CLOSE_DAY`, day 1
+bank entry, partial balances) and unclassified bank entries only run at month close (`AUDIT_CLOSE_DAY`, day 1
 by default): some customers pay the whole month at the end of it, so checking
 that every morning was mostly noise.
 
