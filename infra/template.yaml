@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: laserline-dw — Calcme -> Postgres (RDS) ETL + weekly reports
+
+Parameters:
+  CalcmeBaseUrl:
+    Type: String
+  CalcmeTokenSecretArn:
+    Type: String
+    Description: Secrets Manager ARN holding the Calcme API token
+  DbSecretArn:
+    Type: String
+    Description: Secrets Manager ARN with RDS creds (host, port, dbname, username, password)
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  SecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+
+Globals:
+  Function:
+    Runtime: python3.12
+    CodeUri: ../src
+    MemorySize: 512
+    Timeout: 600
+    VpcConfig:
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: !Ref SecurityGroupIds
+    Environment:
+      Variables:
+        CALCME_BASE_URL: !Ref CalcmeBaseUrl
+        CALCME_API_TOKEN: !Sub "{{resolve:secretsmanager:${CalcmeTokenSecretArn}}}"
+        DB_SECRET_ARN: !Ref DbSecretArn
+        REPORTS_BUCKET: !Ref ReportsBucket
+        TZ: America/Sao_Paulo
+
+Resources:
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration: { Status: Enabled }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  SyncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: laserline.handlers.sync_handler
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy: { SecretArn: !Ref DbSecretArn }
+      Events:
+        Hourly:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 7-20 ? * MON-SAT *)"
+            ScheduleExpressionTimezone: America/Sao_Paulo
+
+  WeeklyReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: laserline.handlers.weekly_report_handler
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy: { SecretArn: !Ref DbSecretArn }
+        - S3WritePolicy: { BucketName: !Ref ReportsBucket }
+      Events:
+        Friday:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 18 ? * FRI *)"
+            ScheduleExpressionTimezone: America/Sao_Paulo
+
+Outputs:
+  ReportsBucketName:
+    Value: !Ref ReportsBucket
