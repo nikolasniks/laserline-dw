@@ -32,3 +32,4 @@ exports/
 .vscode/
 .idea/
 .DS_Store
+config/rules.json

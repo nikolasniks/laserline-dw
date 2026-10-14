@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to config/rules.json (git-ignored). Nicknames -> Calcme customer ids, and markup applied to '*' items.",
+  "aliases": {
+    "store a": { "customer_id": 101 },
+    "store b": { "customer_id": 102 },
+    "reseller x": { "customer_id": 103 }
+  },
+  "markup": {
+    "store a": 0.10,
+    "store b": 0.10
+  }
+}
