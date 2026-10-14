@@ -1,0 +1,34 @@
+# secrets — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+secrets/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# aws sam
+.aws-sam/
+samconfig.toml
+
+# local dumps / exports (may contain customer data)
+data/
+exports/
+*.ofx
+*.csv
+!tests/fixtures/*.csv
+
+# editor
+.vscode/
+.idea/
+.DS_Store
