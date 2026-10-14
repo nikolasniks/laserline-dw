@@ -9,6 +9,11 @@ Checks (read-only):
   - bank entries with no person, with a suggestion from the statement rules
   - open "- saldo" bills left by partial payments
 
+Customer collections (received-without-bank, orders without receivable, overdue
+receivables, open partial balances) are only checked at month close: some
+customers settle the whole month at the end of it, so day to day those checks
+are just noise. `CLOSE_DAY` (default 1) or `full=True` turns them on.
+
 Result goes to S3 (audit/YYYY-MM-DD.json + audit/latest.json) and, when there's
 something to see, to the SNS alerts topic (which e-mails me).
 """
@@ -28,6 +33,8 @@ WINDOW_DAYS = 30
 MATCH_DAYS = 5
 ORDER_GRACE_DAYS = 2
 PAYABLE_HEADS_UP = 3
+CLOSE_DAY = int(os.getenv("AUDIT_CLOSE_DAY", "1"))
+CLOSE_ONLY = ("received_without_bank_entry", "orders_without_receivable", "overdue_receivables", "open_partial_balances")
 BANK_PREFIXES = ("PIX ", "TED ", "DOC ", "TRANSFERENCIA", "DEPOSITO")
 
 
@@ -63,8 +70,10 @@ def _line(b: dict, today: date) -> dict:
 
 
 def audit(receivables: list[dict], payables: list[dict], orders: list[dict], statement_rules: list[dict] | None = None,
-          today: date | None = None) -> dict:
+          today: date | None = None, full: bool | None = None) -> dict:
     today = today or date.today()
+    if full is None:
+        full = today.day == CLOSE_DAY
     since = today - timedelta(days=WINDOW_DAYS)
     bank_in = [b for b in receivables if is_bank_entry(b) and b.get("liquidado")]
 
@@ -114,14 +123,17 @@ def audit(receivables: list[dict], payables: list[dict], orders: list[dict], sta
                 "orders_without_customer": no_customer, "overdue_receivables": overdue,
                 "payables_due_soon": payables_soon, "unclassified_bank_entries": unclassified,
                 "open_partial_balances": balances}
-    return {"date": today.isoformat(), "issues": sum(len(v) for v in sections.values()),
+    if not full:
+        sections = {k: v for k, v in sections.items() if k not in CLOSE_ONLY}
+    return {"date": today.isoformat(), "kind": "month_close" if full else "daily",
+            "issues": sum(len(v) for v in sections.values()),
             "summary": {k: len(v) for k, v in sections.items()}, **sections}
 
 
 def email_text(result: dict) -> tuple[str, str]:
     subject = f"Calcme audit {result['date']}: {result['issues']} item(s)"
     lines = [subject, ""]
-    for key, n in result["summary"].items():
+    for key, n in result["summary"].items():  # summary only lists the sections that ran
         if not n:
             continue
         lines.append(f"- {key.replace('_', ' ')}: {n}")
@@ -131,12 +143,13 @@ def email_text(result: dict) -> tuple[str, str]:
     return subject[:100], "\n".join(lines)
 
 
-def run(client: CalcmeClient | None = None, statement_rules: list[dict] | None = None, today: date | None = None) -> dict:
+def run(client: CalcmeClient | None = None, statement_rules: list[dict] | None = None, today: date | None = None,
+        full: bool | None = None) -> dict:
     import boto3
 
     client = client or CalcmeClient()
     result = audit(list(client.iter_resource("contas_receber")), list(client.iter_resource("contas_pagar")),
-                   list(client.iter_resource("pedidos")), statement_rules, today)
+                   list(client.iter_resource("pedidos")), statement_rules, today, full)
     bucket = os.getenv("REPORTS_BUCKET")
     if bucket:
         s3 = boto3.client("s3")

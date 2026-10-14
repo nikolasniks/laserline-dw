@@ -32,8 +32,14 @@ ORDERS = [
 RULES = [{"contains": "STORE B", "kind": "receive", "person_id": "c2", "label": "Sale"}]
 
 
-def test_audit_finds_each_kind_of_issue():
+def test_daily_run_leaves_collections_for_month_close():
     r = daily.audit(RECEIVABLES, PAYABLES, ORDERS, RULES, TODAY)
+    assert r["kind"] == "daily" and "overdue_receivables" not in r and "orders_without_customer" in r
+    assert daily.audit(RECEIVABLES, PAYABLES, ORDERS, RULES, date(2026, 11, 1))["kind"] == "month_close"
+
+
+def test_audit_finds_each_kind_of_issue():
+    r = daily.audit(RECEIVABLES, PAYABLES, ORDERS, RULES, TODAY, full=True)
     assert [x["number"] for x in r["received_without_bank_entry"]] == [1]
     assert [x["number"] for x in r["overdue_receivables"]] == [2]
     assert [x["number"] for x in r["open_partial_balances"]] == [3]
@@ -45,10 +51,10 @@ def test_audit_finds_each_kind_of_issue():
 
 def test_matching_pix_clears_received_check():
     pix = bill(5, "Pix recebido: A", 1130.5, "2026-09-24", True, received="2026-09-24")
-    r = daily.audit(RECEIVABLES + [pix], PAYABLES, ORDERS, RULES, TODAY)
+    r = daily.audit(RECEIVABLES + [pix], PAYABLES, ORDERS, RULES, TODAY, full=True)
     assert r["received_without_bank_entry"] == []
 
 
 def test_email_lists_sections():
-    subject, text = daily.email_text(daily.audit(RECEIVABLES, PAYABLES, ORDERS, RULES, TODAY))
+    subject, text = daily.email_text(daily.audit(RECEIVABLES, PAYABLES, ORDERS, RULES, TODAY, full=True))
     assert "item(s)" in subject and "overdue receivables" in text
