@@ -32,6 +32,13 @@ def ceil_cents(v: float) -> float:
     return math.ceil(round(v * 100, 6)) / 100
 
 
+def round_up(v: float, step: float = 0.10) -> float:
+    """Round UP to the next multiple of `step` (default 10 cents: 2.288 -> 2.30, 2.29 -> 2.30)."""
+    if not step:
+        return round(v, 2)
+    return round(math.ceil(round(v / step, 6)) * step, 2)
+
+
 @dataclass
 class OrderItem:
     name: str
@@ -39,7 +46,7 @@ class OrderItem:
     quantity: float = 1
     unit_price: float = 0.0
     product_id: str | None = None
-    marked: bool = False          # item flagged with '*' in the note
+    marked: bool = False          # '*' in the note = price already includes the customer's markup
     area_m2: float | None = None
 
 
@@ -73,6 +80,7 @@ def parse_note(note: str, rules: dict | None = None) -> OrderDraft:
         draft.warnings.append(f"unknown customer nickname: {lines[0]!r}")
 
     markup = rules["markup"].get(alias, 0.0)
+    step = rules.get("rounding_step", {}).get(alias, 0.10)
     for raw in lines[1:]:
         m = LINE_RE.match(raw)
         if not m:
@@ -80,8 +88,8 @@ def parse_note(note: str, rules: dict | None = None) -> OrderDraft:
             continue
         price = float((m["price"] or "0").replace(",", "."))
         star = bool(m["star"])
-        if star and markup:
-            price = ceil_cents(price * (1 + markup))
+        if markup and not star:      # starred lines were already marked up on paper
+            price = round_up(price * (1 + markup), step)
         draft.items.append(OrderItem(
             name=m["name"].strip(), description=m["dims"] or "",
             quantity=float(m["qty"].replace(",", ".")), unit_price=price,

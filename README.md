@@ -31,7 +31,8 @@ laserline-dw/
 │   ├── calcme_client.py # REST client: auth, pagination, retries
 │   ├── etl/             # extract (raw JSONB) + transform (dims/facts)
 │   ├── reports/         # weekly KPIs → S3 (json + csv)
-│   ├── connector/       # MCP server + order-note parser
+│   ├── connector/       # MCP server, order-note parser, payments
+│   ├── audit/           # daily checks → S3 + e-mail
 │   └── handlers.py      # Lambda entrypoints
 ├── infra/template.yaml  # AWS SAM: Lambdas, schedules, S3
 ├── config/              # rules.example.json (real one is git-ignored)
@@ -68,6 +69,7 @@ sliced by the same date / customer / product. Full rundown in
 |---|---|---|
 | `sync_handler` | hourly, 07–20h, Mon–Sat | extract + transform |
 | `weekly_report_handler` | Fridays 18:00 | KPIs → `s3://…/reports/weekly/YYYY/WW/` |
+| `daily_audit_handler` | every day 06:50 | checks Calcme → `s3://…/audit/` + e-mail via SNS |
 
 ## Connector
 
@@ -104,7 +106,8 @@ see [`docs/prompts.md`](docs/prompts.md).
 
 - [ ] dbt models on top of `dw`
 - [ ] Metabase dashboards
-- [ ] Slack/email ping when the weekly report lands
+- [x] e-mail when something needs a look (daily audit)
+- [ ] Slack ping when the weekly report lands
 - [ ] cutting-time per material in the fact table (for pricing)
 
 ## License

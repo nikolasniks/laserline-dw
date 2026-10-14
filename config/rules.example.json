@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to config/rules.json (git-ignored). Nicknames -> Calcme customer ids, and markup applied to '*' items.",
+  "_comment": "Copy to config/rules.json (git-ignored). Nicknames -> Calcme customer ids, markup for lines WITHOUT '*', statement rules.",
   "aliases": {
     "store a": { "customer_id": 101 },
     "store b": { "customer_id": 102 },
@@ -8,5 +8,13 @@
   "markup": {
     "store a": 0.10,
     "store b": 0.10
-  }
+  },
+  "rounding_step": {
+    "store a": 0.10,
+    "store b": 0.10
+  },
+  "statement": [
+    { "contains": "SUPPLIER NAME", "kind": "pay", "person_id": "supplier-id", "label": "Raw material" },
+    { "contains": "SOME EMPLOYEE", "kind": "pay", "label": "Payroll" }
+  ]
 }

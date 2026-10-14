@@ -22,3 +22,11 @@ def weekly_report_handler(event, context):
     from .reports import weekly
 
     return weekly.run()
+
+
+def daily_audit_handler(event, context):
+    """Every morning: check Calcme and e-mail what needs attention."""
+    from .audit import daily
+    from .connector.orders import load_rules
+
+    return daily.run(statement_rules=load_rules().get("statement", []))

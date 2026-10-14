@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from ..audit import daily
 from ..calcme_client import RESOURCES, CalcmeClient
-from . import orders
+from . import orders, payments
 
 mcp = FastMCP("calcme")
 _client: CalcmeClient | None = None
@@ -70,6 +71,27 @@ def draft_order(note: str, confirm: bool = False) -> dict:
     d = orders.parse_note(note)
     orders.resolve_products(d, client())
     return orders.create_order(d, client(), confirm=confirm)
+
+
+@mcp.tool()
+def record_payment(bill_id: str, paid: float | None = None, kind: str = "receive",
+                   balance_due: str | None = None, confirm: bool = False) -> dict:
+    """Settle a bill. Paid < total -> split: new open bill with the balance, original shrunk and settled."""
+    return payments.record_payment(client(), bill_id, paid, kind, balance_due, confirm)
+
+
+@mcp.tool()
+def undo_payment(bill_id: str, kind: str = "receive", confirm: bool = False) -> dict:
+    """Reopen a settled bill."""
+    return payments.undo_payment(client(), bill_id, kind, confirm)
+
+
+@mcp.tool()
+def audit_now() -> dict:
+    """Run the daily audit right now (read-only, no e-mail)."""
+    c = client()
+    return daily.audit(list(c.iter_resource("contas_receber")), list(c.iter_resource("contas_pagar")),
+                       list(c.iter_resource("pedidos")), orders.load_rules().get("statement", []))
 
 
 if __name__ == "__main__":

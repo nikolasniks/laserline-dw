@@ -27,16 +27,23 @@ def test_date_key():
     assert date_key(None) is None
 
 
-def test_markup_only_on_starred_items():
-    d = orders.parse_note("Store A\n10 cx ts 20x14x8 2,08 *\n5 tag 1,50", RULES)
+def test_round_up_to_ten_cents():
+    assert orders.round_up(2.288) == 2.30
+    assert orders.round_up(2.29) == 2.30
+    assert orders.round_up(2.20) == 2.20
+    assert orders.round_up(2.281, 0.01) == 2.29
+
+
+def test_markup_skips_starred_items():
+    d = orders.parse_note("Store A\n10 cx ts 20x14x8 2,08\n5 tag 1,50 *", RULES)
     assert d.customer_id == "101"
-    starred, plain = d.items
-    assert starred.unit_price == 2.29   # 2.08 * 1.10 = 2.288 -> 2.29
-    assert plain.unit_price == 1.50
+    plain, starred = d.items
+    assert plain.unit_price == 2.30     # 2.08 * 1.10 = 2.288 -> rounded up to 2.30
+    assert starred.unit_price == 1.50   # '*' = already marked up
 
 
 def test_no_markup_for_other_customers():
-    d = orders.parse_note("Reseller X\n10 cx ts 20x14x8 2,08 *", RULES)
+    d = orders.parse_note("Reseller X\n10 cx ts 20x14x8 2,08", RULES)
     assert d.items[0].unit_price == 2.08
 
 

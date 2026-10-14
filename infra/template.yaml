@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: laserline-dw — Calcme -> Postgres (RDS) ETL + weekly reports
+Description: laserline-dw — Calcme -> Postgres (RDS) ETL, weekly reports and daily audit
 
 Parameters:
   CalcmeBaseUrl:
@@ -15,6 +15,13 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
   SecurityGroupIds:
     Type: List<AWS::EC2::SecurityGroup::Id>
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: where the daily audit and failure alarms go (empty = no e-mail)
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
 
 Globals:
   Function:
@@ -31,6 +38,7 @@ Globals:
         CALCME_API_TOKEN: !Sub "{{resolve:secretsmanager:${CalcmeTokenSecretArn}}}"
         DB_SECRET_ARN: !Ref DbSecretArn
         REPORTS_BUCKET: !Ref ReportsBucket
+        ALERTS_TOPIC_ARN: !Ref AlertsTopic
         TZ: America/Sao_Paulo
 
 Resources:
@@ -73,6 +81,32 @@ Resources:
           Properties:
             ScheduleExpression: "cron(0 18 ? * FRI *)"
             ScheduleExpressionTimezone: America/Sao_Paulo
+
+  DailyAuditFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: laserline.handlers.daily_audit_handler
+      Timeout: 300
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref ReportsBucket }
+        - SNSPublishMessagePolicy: { TopicName: !GetAtt AlertsTopic.TopicName }
+      Events:
+        Morning:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(50 6 * * ? *)"
+            ScheduleExpressionTimezone: America/Sao_Paulo
+
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+
+  AlertsSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertsTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
 
 Outputs:
   ReportsBucketName:
