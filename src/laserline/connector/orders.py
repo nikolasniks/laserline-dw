@@ -27,11 +27,6 @@ def load_rules(path: Path = RULES_PATH) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def ceil_cents(v: float) -> float:
-    """Round UP to the next cent (2.291 -> 2.30)."""
-    return math.ceil(round(v * 100, 6)) / 100
-
-
 def round_up(v: float, step: float = 0.10) -> float:
     """Round UP to the next multiple of `step` (default 10 cents: 2.288 -> 2.30, 2.29 -> 2.30)."""
     if not step:

@@ -12,9 +12,9 @@ RULES = {
 }
 
 
-def test_ceil_cents_rounds_up():
-    assert orders.ceil_cents(2.291) == 2.30
-    assert orders.ceil_cents(2.30) == 2.30
+def test_round_up_to_cent():
+    assert orders.round_up(2.291, 0.01) == 2.30
+    assert orders.round_up(2.30, 0.01) == 2.30
 
 
 def test_area_from_dims():
