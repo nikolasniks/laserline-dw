@@ -169,8 +169,17 @@ def _load_installments(conn, resource, table, id_col, party_col, party_dim, part
                        party_key, ref_col, ref_key) -> int:
     rows = _latest(conn, resource)
     for (r,) in rows:
-        amount = float(r.get("valor") or 0)
-        paid = float(r.get("valor_pago") or 0)
+        # the bills endpoint returns valorConta / liquidado / dataVencimento (same names the
+        # connector writes back); older payloads used valor / valor_pago / vencimento.
+        amount = float(r.get("valorConta") or r.get("valor") or 0)
+        settled = r.get("liquidado")
+        if settled is not None:
+            paid = amount if settled else float(r.get("valor_pago") or 0)
+        else:
+            paid = float(r.get("valor_pago") or 0)
+        issue = r.get("dataCompetencia") or r.get("emissao")
+        due = r.get("dataVencimento") or r.get("vencimento")
+        paid_on = r.get("dataLiquidacao") or r.get("dataPagamento") or r.get("pagamento")
         conn.execute(
             f"""INSERT INTO dw.{table}
                   ({id_col}, {ref_col}, {party_col}, issue_date_key, due_date_key, paid_date_key,
@@ -180,9 +189,9 @@ def _load_installments(conn, resource, table, id_col, party_col, party_dim, part
                   paid_date_key = EXCLUDED.paid_date_key, amount = EXCLUDED.amount,
                   amount_paid = EXCLUDED.amount_paid, is_paid = EXCLUDED.is_paid, loaded_at = now()""",
             (str(r["id"]), r.get(ref_key),
-             _sk(conn, party_dim, party_sk, party_nk, r.get(party_key)),
-             date_key(r.get("emissao")), date_key(r.get("vencimento")),
-             date_key(r.get("pagamento")), amount, paid, paid >= amount > 0),
+             _sk(conn, party_dim, party_sk, party_nk, r.get(party_key) or r.get("personId")),
+             date_key(issue), date_key(due), date_key(paid_on),
+             amount, paid, bool(settled) if settled is not None else paid >= amount > 0),
         )
     return len(rows)
 

@@ -6,7 +6,7 @@ SELECT d.full_date,
        COUNT(DISTINCT f.order_id) AS orders,
        SUM(f.quantity)            AS items,
        SUM(f.line_total)          AS revenue,
-       SUM(f.area_m2)             AS area_m2
+       SUM(f.area_m2 * f.quantity) AS area_m2
 FROM dw.fact_order_line f
 JOIN dw.dim_date d ON d.date_key = f.order_date_key
 GROUP BY d.full_date;
@@ -34,14 +34,28 @@ GROUP BY p.product_id, p.name
 ORDER BY revenue DESC;
 
 CREATE OR REPLACE VIEW dw.v_cash_position AS
-SELECT 'receivable' AS side, SUM(amount - amount_paid) AS open_amount,
+SELECT 'receivable' AS side,
+       COALESCE(SUM(CASE WHEN NOT is_paid THEN amount - amount_paid ELSE 0 END), 0) AS open_amount,
        SUM(CASE WHEN NOT is_paid AND d.full_date < current_date
                 THEN amount - amount_paid ELSE 0 END) AS overdue
 FROM dw.fact_receivable r
 LEFT JOIN dw.dim_date d ON d.date_key = r.due_date_key
 UNION ALL
-SELECT 'payable', SUM(amount - amount_paid),
+SELECT 'payable',
+       COALESCE(SUM(CASE WHEN NOT is_paid THEN amount - amount_paid ELSE 0 END), 0),
        SUM(CASE WHEN NOT is_paid AND d.full_date < current_date
                 THEN amount - amount_paid ELSE 0 END)
 FROM dw.fact_payable p
 LEFT JOIN dw.dim_date d ON d.date_key = p.due_date_key;
+
+-- Monthly view for the management dashboard: revenue, orders, ticket and MDF area.
+CREATE OR REPLACE VIEW dw.v_sales_monthly AS
+SELECT date_trunc('month', d.full_date)::date                       AS month,
+       COUNT(DISTINCT f.order_id)                                   AS orders,
+       SUM(f.line_total)                                            AS revenue,
+       ROUND(SUM(f.line_total) / NULLIF(COUNT(DISTINCT f.order_id), 0), 2) AS avg_ticket,
+       COALESCE(SUM(f.area_m2 * f.quantity), 0)                      AS area_m2
+FROM dw.fact_order_line f
+JOIN dw.dim_date d ON d.date_key = f.order_date_key
+GROUP BY 1;
+

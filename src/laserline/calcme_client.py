@@ -63,7 +63,10 @@ class CalcmeClient:
     def _request(self, method: str, path: str, **kw) -> Any:
         url = f"{self.base_url}{path}"
         resp = self.session.request(method, url, timeout=self.timeout, **kw)
-        if resp.status_code == 429 or resp.status_code >= 500:
+        # 429 means the request was rejected before running, so it is always safe to retry.
+        # A 5xx on POST may already have created the record: retrying would duplicate
+        # orders/bills, so only idempotent methods (GET, PUT) retry on 5xx.
+        if resp.status_code == 429 or (resp.status_code >= 500 and method in ("GET", "PUT")):
             log.warning("calcme %s %s -> %s, backing off", method, path, resp.status_code)
             raise _Retryable(f"{resp.status_code} on {path}")
         if not resp.ok:

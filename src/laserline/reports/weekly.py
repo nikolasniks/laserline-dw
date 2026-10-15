@@ -48,7 +48,7 @@ def _rows_to_csv(cols, rows) -> bytes:
 def build(conn, start: date, end: date) -> dict:
     kpi = conn.execute(
         """SELECT COUNT(DISTINCT f.order_id), COALESCE(SUM(f.line_total),0),
-                  COALESCE(SUM(f.area_m2),0)
+                  COALESCE(SUM(f.area_m2 * f.quantity),0)
              FROM dw.fact_order_line f JOIN dw.dim_date d ON d.date_key = f.order_date_key
             WHERE d.full_date BETWEEN %s AND %s""",
         (start, end),
@@ -94,6 +94,7 @@ def run(today: date | None = None) -> dict:
                               Body=_rows_to_csv(cols, cur.fetchall()), ContentType="text/csv")
             db.finish_run(conn, run_id, rows_out=3)
         except Exception as e:  # noqa: BLE001
+            conn.rollback()  # an aborted transaction would make finish_run fail and hide the real error
             db.finish_run(conn, run_id, status="failed", error=str(e))
             raise
     log.info("weekly report saved to s3://%s/%s", s.reports_bucket, prefix)
